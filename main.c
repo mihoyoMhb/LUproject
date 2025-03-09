@@ -4,7 +4,6 @@
 #include <omp.h>
 #include "LU_decomposition.h"
 #include "LU_optimized.h"
-#include "LU_parallel.h"
 #include "Test_LU.h"
 
 /**
@@ -39,16 +38,14 @@ void runAllTests(int num_threads) {
         printf("\nPositive definite matrix tests:\n");
         
         // Run all LU decomposition tests (original, optimized, parallel)
-        testAllLU(A_posdef, n, num_threads);
+        testAllLU(A_posdef, n);
         
         // Run all Cholesky decomposition tests
-        testAllCholesky(A_posdef, n, num_threads);
+        testAllCholesky(A_posdef, n);
         
         // Run all LU with partial pivoting tests
-        testAllPivotLU(A_posdef, n, num_threads);
+        testAllPivotLU(A_posdef, n);
         
-        // Run all LDLT decomposition tests
-        testAllLDLT(A_posdef, n, num_threads);
         
         // Count this as a valid test for averaging
         valid_tests++;

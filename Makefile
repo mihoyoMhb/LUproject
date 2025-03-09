@@ -11,9 +11,9 @@ LDFLAGS = -lm -fopenmp
 TARGET = matrix_test
 
 # Source files and object files
-SRC = main.c LU_decomposition.c LU_optimized.c LU_parallel.c Test_LU.c
+SRC = main.c LU_decomposition.c LU_optimized.c  Test_LU.c
 OBJ = $(SRC:.c=.o)
-HEADERS = LU_decomposition.h LU_optimized.h LU_parallel.h Test_LU.h
+HEADERS = LU_decomposition.h LU_optimized.h  Test_LU.h
 
 # Default target
 all: $(TARGET)

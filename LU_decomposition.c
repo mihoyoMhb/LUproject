@@ -120,42 +120,7 @@ void PartialPivotingLU(double **A, double **L, double **U, int *P, int n) {
     free(tempA);
 }
 
-// LDL^T分解，返回0成功，-1失败（矩阵非对称或无法分解）
-int LDLTDecomposition(double **A, double **L, double *D, int n) {
-    // 检查对称性
-    for (int i = 0; i < n; i++) {
-        for (int j = i + 1; j < n; j++) {
-            if (A[i][j] != A[j][i]) return -1;
-        }
-    }
 
-    // 初始化L为单位下三角矩阵，D为对角矩阵
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            L[i][j] = (i == j) ? 1.0 : 0.0;
-        }
-    }
-
-    for (int j = 0; j < n; j++) {
-        // 计算D[j]
-        double sum_d = A[j][j];
-        for (int k = 0; k < j; k++) {
-            sum_d -= L[j][k] * L[j][k] * D[k];
-        }
-        if (sum_d == 0.0) return -1; // 分解失败
-        D[j] = sum_d;
-
-        // 计算L的第j列（i > j）
-        for (int i = j + 1; i < n; i++) {
-            double sum_l = A[i][j];
-            for (int k = 0; k < j; k++) {
-                sum_l -= L[i][k] * L[j][k] * D[k];
-            }
-            L[i][j] = sum_l / D[j];
-        }
-    }
-    return 0;
-}
 
 /* 打印矩阵 */
 void printMatrix(double **M, int n, int m) {

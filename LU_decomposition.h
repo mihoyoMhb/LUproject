@@ -34,15 +34,6 @@ int CholeskyDecomposition(double **A, double **L, int n);
  */
 void PartialPivotingLU(double **A, double **L, double **U, int *P, int n);
 
-/**
- * LDL^T decomposition for symmetric matrices
- * @param A Input matrix (n x n), must be symmetric
- * @param L Lower triangular matrix with diagonal elements = 1
- * @param D Array representing diagonal matrix
- * @param n Matrix dimension
- * @return 0 if successful, -1 if matrix is not symmetric or decomposition failed
- */
-int LDLTDecomposition(double **A, double **L, double *D, int n);
 
 /**
  * Print a matrix to console
