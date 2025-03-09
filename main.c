@@ -1,24 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <omp.h>
 #include "LU_decomposition.h"
 #include "LU_optimized.h"
+#include "LU_parallel.h"
 #include "Test_LU.h"
 
 /**
- * Run optimized performance tests with different matrix sizes
- * Only tests on positive definite matrices
+ * Run performance tests on all implementations
  */
-void runAllTests() {
+void runAllTests(int num_threads) {
     // Print test header with timestamp
     printf("=================================================================\n");
     printf("LU Decomposition Performance Tests - mihoyoMhb\n");
-    printf("Date: 2025-03-09 11:20:07 UTC\n");
-    printf("Testing serial optimizations on positive definite matrices only\n");
+    printf("Date: 2025-03-09 12:18:32 UTC\n");
+    printf("Testing all implementations on positive definite matrices\n");
+    printf("Parallel implementation using %d threads\n", num_threads);
     printf("=================================================================\n");
     
     // Test with different matrix sizes
-    int sizes[] = {200, 400, 500, 800, 1000, 1500};
+    int sizes[] = {5, 50, 100, 200, 500, 1000};
     int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
     
     // For storing total speedups to calculate average
@@ -40,29 +42,17 @@ void runAllTests() {
         
         printf("\nPositive definite matrix tests:\n");
         
-        // Test standard LU decomposition
-        double speedup_lu = testLUdecomposition(A_posdef, n);
-        if (speedup_lu > 0) {
-            total_lu_speedup += speedup_lu;
-        }
+        // Run all LU decomposition tests (original, optimized, parallel)
+        testAllLU(A_posdef, n, num_threads);
         
-        // Test Cholesky decomposition
-        double speedup_chol = testCholeskyDecomposition(A_posdef, n);
-        if (speedup_chol > 0) {
-            total_chol_speedup += speedup_chol;
-        }
+        // Run all Cholesky decomposition tests
+        testAllCholesky(A_posdef, n, num_threads);
         
-        // Test LU with partial pivoting
-        double speedup_plu = testPartialPivotingLU(A_posdef, n);
-        if (speedup_plu > 0) {
-            total_plu_speedup += speedup_plu;
-        }
+        // Run all LU with partial pivoting tests
+        testAllPivotLU(A_posdef, n, num_threads);
         
-        // Test LDLT decomposition
-        double speedup_ldlt = testLDLTDecomposition(A_posdef, n);
-        if (speedup_ldlt > 0) {
-            total_ldlt_speedup += speedup_ldlt;
-        }
+        // Run all LDLT decomposition tests
+        testAllLDLT(A_posdef, n, num_threads);
         
         // Count this as a valid test for averaging
         valid_tests++;
@@ -71,28 +61,27 @@ void runAllTests() {
         freeMatrix(A_posdef, n);
     }
     
-    // Print summary of speedups
     printf("\n==================================================\n");
     printf("PERFORMANCE SUMMARY\n");
     printf("==================================================\n");
-    
-    if (valid_tests > 0) {
-        printf("Average speedups from serial optimizations:\n");
-        printf("  LU Decomposition:           %.2f times faster\n", total_lu_speedup / valid_tests);
-        printf("  Cholesky Decomposition:     %.2f times faster\n", total_chol_speedup / valid_tests);
-        printf("  Partial Pivoting LU:        %.2f times faster\n", total_plu_speedup / valid_tests);
-        printf("  LDL^T Decomposition:        %.2f times faster\n", total_ldlt_speedup / valid_tests);
-        printf("  Overall Average Speedup:    %.2f times faster\n", 
-               (total_lu_speedup + total_chol_speedup + total_plu_speedup + total_ldlt_speedup) / (valid_tests * 4));
-    }
+    printf("8-thread OpenMP parallelization testing completed\n");
+    printf("Test run by: mihoyoMhb on 2025-03-09 12:18:32 UTC\n");
+    printf("==================================================\n");
 }
 
 int main() {
     // Seed random number generator
     srand(time(NULL));
     
-    // Run optimized performance tests
-    runAllTests();
+    // Set number of threads to use in parallel implementations
+    int num_threads = 8;
+    
+    // Report available threads
+    printf("System has %d processors available\n", omp_get_num_procs());
+    printf("Running tests with %d threads\n\n", num_threads);
+    
+    // Run all tests with 8 threads
+    runAllTests(num_threads);
     
     return 0;
 }

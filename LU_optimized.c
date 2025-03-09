@@ -1,8 +1,12 @@
 #include "LU_optimized.h"
 
 /* Optimized LU decomposition */
-void LUdecomposition_optimized(double **A, double **L, double **U, int n) {
+void LUdecomposition_optimized(double * restrict const * restrict A, 
+                              double * restrict * restrict L, 
+                              double * restrict * restrict U, 
+                              const int n) {
     // Initialize L as identity matrix and U as zero matrix
+    #pragma omp simd
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             L[i][j] = (i == j) ? 1.0 : 0.0;
@@ -10,9 +14,10 @@ void LUdecomposition_optimized(double **A, double **L, double **U, int n) {
         }
     }
     
-    // Cache-friendly implementation with loop reordering and reduced divisions
+    // Cache-friendly implementation with loop reordering
     for (int i = 0; i < n; i++) {
-        // Compute U's i-th row
+        // Pre-compute U's i-th row
+        #pragma omp simd
         for (int j = i; j < n; j++) {
             double sum = A[i][j];
             for (int k = 0; k < i; k++) {
@@ -21,10 +26,10 @@ void LUdecomposition_optimized(double **A, double **L, double **U, int n) {
             U[i][j] = sum;
         }
         
-        // Precompute division factor for L's column calculation
-        double u_ii_inv = 1.0 / U[i][i];
+        // Use the computed U values to calculate L's i-th column
+        double u_ii_inv = 1.0 / U[i][i]; // Precompute division
         
-        // Compute L's i-th column
+        #pragma omp simd
         for (int j = i + 1; j < n; j++) {
             double sum = A[j][i];
             for (int k = 0; k < i; k++) {
@@ -36,8 +41,11 @@ void LUdecomposition_optimized(double **A, double **L, double **U, int n) {
 }
 
 /* Optimized Cholesky decomposition */
-int CholeskyDecomposition_optimized(double **A, double **L, int n) {
+int CholeskyDecomposition_optimized(double * restrict const * restrict A, 
+                                  double * restrict * restrict L, 
+                                  const int n) {
     // Initialize L to 0
+    #pragma omp simd
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             L[i][j] = 0.0;
@@ -49,6 +57,7 @@ int CholeskyDecomposition_optimized(double **A, double **L, int n) {
         double sum_diag = A[j][j];
         
         // Update diagonal element j,j
+        #pragma omp simd reduction(-:sum_diag)
         for (int k = 0; k < j; k++) {
             double L_jk = L[j][k];
             sum_diag -= L_jk * L_jk;
@@ -62,6 +71,7 @@ int CholeskyDecomposition_optimized(double **A, double **L, int n) {
         double inv_L_jj = 1.0 / L[j][j];
         
         // Compute remaining elements in column j
+        #pragma omp simd
         for (int i = j + 1; i < n; i++) {
             double sum = A[i][j];
             for (int k = 0; k < j; k++) {
@@ -74,17 +84,24 @@ int CholeskyDecomposition_optimized(double **A, double **L, int n) {
 }
 
 /* Optimized LU decomposition with partial pivoting */
-void PartialPivotingLU_optimized(double **A, double **L, double **U, int *P, int n) {
+void PartialPivotingLU_optimized(double * restrict const * restrict A, 
+                               double * restrict * restrict L, 
+                               double * restrict * restrict U, 
+                               int * restrict P, 
+                               const int n) {
     // Initialize P as [0,1,...,n-1]
+    #pragma omp simd
     for (int i = 0; i < n; i++) {
         P[i] = i;
     }
     
     // Make a copy of A to avoid modifying the original
-    double **tempA = (double **)malloc(n * sizeof(double *));
+    double ** restrict tempA = (double **)malloc(n * sizeof(double *));
+    
     for (int i = 0; i < n; i++) {
         tempA[i] = (double *)malloc(n * sizeof(double));
         // Initialize L and U, copy A to tempA
+        #pragma omp simd
         for (int j = 0; j < n; j++) {
             tempA[i][j] = A[i][j];
             L[i][j] = (i == j) ? 1.0 : 0.0;
@@ -109,7 +126,7 @@ void PartialPivotingLU_optimized(double **A, double **L, double **U, int *P, int
         // Swap rows if needed
         if (max_row != k) {
             // Swap tempA rows efficiently
-            double *tmp_row = tempA[k];
+            double * restrict tmp_row = tempA[k];
             tempA[k] = tempA[max_row];
             tempA[max_row] = tmp_row;
             
@@ -119,6 +136,7 @@ void PartialPivotingLU_optimized(double **A, double **L, double **U, int *P, int
             P[max_row] = temp_p;
             
             // Swap already calculated parts of L (only columns 0 to k-1)
+            #pragma omp simd
             for (int j = 0; j < k; j++) {
                 double temp_l = L[k][j];
                 L[k][j] = L[max_row][j];
@@ -127,6 +145,7 @@ void PartialPivotingLU_optimized(double **A, double **L, double **U, int *P, int
         }
         
         // Calculate U's k-th row
+        #pragma omp simd
         for (int j = k; j < n; j++) {
             double sum = tempA[k][j];
             for (int m = 0; m < k; m++) {
@@ -139,6 +158,7 @@ void PartialPivotingLU_optimized(double **A, double **L, double **U, int *P, int
         if (U[k][k] != 0.0) {  // Avoid division by zero
             double u_kk_inv = 1.0 / U[k][k];
             
+            #pragma omp simd
             for (int i = k + 1; i < n; i++) {
                 double sum = tempA[i][k];
                 for (int m = 0; m < k; m++) {
@@ -157,7 +177,10 @@ void PartialPivotingLU_optimized(double **A, double **L, double **U, int *P, int
 }
 
 /* Optimized LDL^T decomposition */
-int LDLTDecomposition_optimized(double **A, double **L, double *D, int n) {
+int LDLTDecomposition_optimized(double * restrict const * restrict A, 
+                              double * restrict * restrict L, 
+                              double * restrict D, 
+                              const int n) {
     // First check if matrix is symmetric (only check upper triangle)
     for (int i = 0; i < n; i++) {
         for (int j = i + 1; j < n; j++) {
@@ -166,6 +189,7 @@ int LDLTDecomposition_optimized(double **A, double **L, double *D, int n) {
     }
     
     // Initialize L as identity matrix
+    #pragma omp simd
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             L[i][j] = (i == j) ? 1.0 : 0.0;
@@ -176,6 +200,8 @@ int LDLTDecomposition_optimized(double **A, double **L, double *D, int n) {
     for (int j = 0; j < n; j++) {
         // Calculate D[j]
         double d_sum = A[j][j];
+        
+        #pragma omp simd reduction(-:d_sum)
         for (int k = 0; k < j; k++) {
             double L_jk_squared = L[j][k] * L[j][k];
             d_sum -= L_jk_squared * D[k];
@@ -186,6 +212,8 @@ int LDLTDecomposition_optimized(double **A, double **L, double *D, int n) {
         
         // Calculate column j of L
         double d_j_inv = 1.0 / D[j];
+        
+        #pragma omp simd
         for (int i = j + 1; i < n; i++) {
             double l_sum = A[i][j];
             for (int k = 0; k < j; k++) {

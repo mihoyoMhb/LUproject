@@ -3,90 +3,59 @@
 
 #include "LU_decomposition.h"
 #include "LU_optimized.h"
+#include "LU_parallel.h"
 
-/**
- * Allocate a dynamic 2D matrix
- * @param n Matrix dimension
- * @return Allocated matrix
- */
+// Matrix handling functions
 double** allocateMatrix(int n);
-
-/**
- * Free a dynamic 2D matrix
- * @param matrix Matrix to free
- * @param n Matrix dimension
- */
 void freeMatrix(double **matrix, int n);
-
-/**
- * Create a random matrix
- * @param A Output matrix
- * @param n Matrix dimension
- */
 void randomMatrix(double **A, int n);
-
-/**
- * Create a symmetric matrix
- * @param A Output matrix
- * @param n Matrix dimension
- */
 void symmetricMatrix(double **A, int n);
-
-/**
- * Create a symmetric positive definite matrix
- * @param A Output matrix
- * @param n Matrix dimension
- */
 void positiveDefiniteMatrix(double **A, int n);
-
-/**
- * Multiply two matrices C = A*B
- * @param A First matrix
- * @param B Second matrix
- * @param C Result matrix
- * @param n Matrix dimension
- */
 void multiplyMatrices(double **A, double **B, double **C, int n);
-
-/**
- * Calculate Frobenius norm of difference between two matrices
- * @param A First matrix
- * @param B Second matrix
- * @param n Matrix dimension
- * @return Error value
- */
 double matrixError(double **A, double **B, int n);
 
-/**
- * Test standard LU decomposition (original and optimized)
- * @param A Input matrix
- * @param n Matrix dimension
- * @return Speedup ratio (optimized/original) or -1 if test failed
- */
-double testLUdecomposition(double **A, int n);
+// Function pointer types for different decomposition methods
+typedef void (*LUFunction)(double**, double**, double**, int);
+typedef int (*CholeskyFunction)(double**, double**, int);
+typedef void (*PivotLUFunction)(double**, double**, double**, int*, int);
+typedef int (*LDLTFunction)(double**, double**, double*, int);
+
+// Parallel function pointer types
+typedef void (*LUFunctionP)(double**, double**, double**, int, int);
+typedef int (*CholeskyFunctionP)(double**, double**, int, int);
+typedef void (*PivotLUFunctionP)(double**, double**, double**, int*, int, int);
+typedef int (*LDLTFunctionP)(double**, double**, double*, int, int);
 
 /**
- * Test Cholesky decomposition (original and optimized)
+ * Test different implementations of LU decomposition
  * @param A Input matrix
  * @param n Matrix dimension
- * @return Speedup ratio (optimized/original) or -1 if test failed
+ * @param num_threads Number of threads for parallel implementation
  */
-double testCholeskyDecomposition(double **A, int n);
+void testAllLU(double **A, int n, int num_threads);
 
 /**
- * Test LU decomposition with partial pivoting (original and optimized)
+ * Test different implementations of Cholesky decomposition
  * @param A Input matrix
  * @param n Matrix dimension
- * @return Speedup ratio (optimized/original) or -1 if test failed
+ * @param num_threads Number of threads for parallel implementation
  */
-double testPartialPivotingLU(double **A, int n);
+void testAllCholesky(double **A, int n, int num_threads);
 
 /**
- * Test LDL^T decomposition (original and optimized)
+ * Test different implementations of LU with partial pivoting
  * @param A Input matrix
  * @param n Matrix dimension
- * @return Speedup ratio (optimized/original) or -1 if test failed
+ * @param num_threads Number of threads for parallel implementation
  */
-double testLDLTDecomposition(double **A, int n);
+void testAllPivotLU(double **A, int n, int num_threads);
+
+/**
+ * Test different implementations of LDLT decomposition
+ * @param A Input matrix
+ * @param n Matrix dimension
+ * @param num_threads Number of threads for parallel implementation
+ */
+void testAllLDLT(double **A, int n, int num_threads);
 
 #endif /* TEST_LU_H */

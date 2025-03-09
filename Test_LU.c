@@ -4,6 +4,7 @@
 #include <math.h>
 #include "LU_decomposition.h"
 #include "LU_optimized.h"
+#include "LU_parallel.h"
 #include "Test_LU.h"
 
 // Allocate a dynamic 2D matrix
@@ -44,11 +45,9 @@ void symmetricMatrix(double **A, int n) {
 
 // Create a symmetric positive definite matrix
 void positiveDefiniteMatrix(double **A, int n) {
-    // First create a random matrix
     double **B = allocateMatrix(n);
     randomMatrix(B, n);
     
-    // Then form A = B*B^T + n*I to ensure it's positive definite
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             double sum = 0.0;
@@ -87,386 +86,487 @@ double matrixError(double **A, double **B, int n) {
     return sqrt(sum);
 }
 
-// Test standard LU decomposition (original and optimized)
-double testLUdecomposition(double **A, int n) {
-    printf("\n--- Testing LU decomposition ---\n");
+// General LU testing function for all three implementations
+void testAllLU(double **A, int n, int num_threads) {
+    printf("\n--- Testing LU decomposition (all implementations) ---\n");
     
-    // For original algorithm
-    double **L = allocateMatrix(n);
-    double **U = allocateMatrix(n);
-    double **LU = allocateMatrix(n);
+    double **L_orig = allocateMatrix(n);
+    double **U_orig = allocateMatrix(n);
+    double **L_opt = allocateMatrix(n);
+    double **U_opt = allocateMatrix(n);
+    double **L_par = allocateMatrix(n);
+    double **U_par = allocateMatrix(n);
+    double **Result = allocateMatrix(n);
     
-    // Measure time for original algorithm
+    // Test original implementation
     clock_t start = clock();
-    LUdecomposition(A, L, U, n);
+    LUdecomposition(A, L_orig, U_orig, n);
     clock_t end = clock();
     double time_orig = (double)(end - start) / CLOCKS_PER_SEC;
     
-    // Verify result: A = L*U
-    multiplyMatrices(L, U, LU, n);
-    double error_orig = matrixError(A, LU, n);
+    multiplyMatrices(L_orig, U_orig, Result, n);
+    double error_orig = matrixError(A, Result, n);
     
-    printf("Original algorithm:\n");
-    printf("  Time taken: %f seconds\n", time_orig);
-    printf("  Reconstruction error: %e\n", error_orig);
+    printf("Original implementation:\n");
+    printf("  Time: %f seconds\n", time_orig);
+    printf("  Error: %e\n", error_orig);
     
-    // For optimized algorithm
-    double **L_opt = allocateMatrix(n);
-    double **U_opt = allocateMatrix(n);
-    double **LU_opt = allocateMatrix(n);
-    
-    // Measure time for optimized algorithm
+    // Test optimized implementation
     start = clock();
     LUdecomposition_optimized(A, L_opt, U_opt, n);
     end = clock();
     double time_opt = (double)(end - start) / CLOCKS_PER_SEC;
     
-    // Verify result: A = L*U
-    multiplyMatrices(L_opt, U_opt, LU_opt, n);
-    double error_opt = matrixError(A, LU_opt, n);
+    multiplyMatrices(L_opt, U_opt, Result, n);
+    double error_opt = matrixError(A, Result, n);
+    double speedup_opt = time_orig / time_opt;
     
-    double speedup = time_orig / time_opt;
+    printf("Optimized implementation:\n");
+    printf("  Time: %f seconds\n", time_opt);
+    printf("  Error: %e\n", error_opt);
+    printf("  Speedup vs original: %.2f times\n", speedup_opt);
     
-    printf("Optimized algorithm:\n");
-    printf("  Time taken: %f seconds\n", time_opt);
-    printf("  Reconstruction error: %e\n", error_opt);
-    printf("  Speedup: %.2f times\n", speedup);
+    // Test parallel implementation
+    start = clock();
+    LUdecomposition_parallel(A, L_par, U_par, n, num_threads);
+    end = clock();
+    double time_par = (double)(end - start) / CLOCKS_PER_SEC;
     
+    multiplyMatrices(L_par, U_par, Result, n);
+    double error_par = matrixError(A, Result, n);
+    double speedup_par = time_orig / time_par;
+    
+    printf("Parallel implementation (%d threads):\n", num_threads);
+    printf("  Time: %f seconds\n", time_par);
+    printf("  Error: %e\n", error_par);
+    printf("  Speedup vs original: %.2f times\n", speedup_par);
+    printf("  Parallel efficiency: %.2f%%\n", (speedup_par / num_threads) * 100.0);
+    
+    // Display small matrices if requested
     if (n <= 5) {
         printf("Original matrix A:\n");
         printMatrix(A, n, n);
         printf("L matrix (original):\n");
-        printMatrix(L, n, n);
+        printMatrix(L_orig, n, n);
         printf("U matrix (original):\n");
-        printMatrix(U, n, n);
-        printf("L matrix (optimized):\n");
-        printMatrix(L_opt, n, n);
-        printf("U matrix (optimized):\n");
-        printMatrix(U_opt, n, n);
+        printMatrix(U_orig, n, n);
     }
     
-    freeMatrix(L, n);
-    freeMatrix(U, n);
-    freeMatrix(LU, n);
+    // Free memory
+    freeMatrix(L_orig, n);
+    freeMatrix(U_orig, n);
     freeMatrix(L_opt, n);
     freeMatrix(U_opt, n);
-    freeMatrix(LU_opt, n);
-    
-    return speedup;
+    freeMatrix(L_par, n);
+    freeMatrix(U_par, n);
+    freeMatrix(Result, n);
 }
 
-// Test Cholesky decomposition (original and optimized)
-double testCholeskyDecomposition(double **A, int n) {
-    printf("\n--- Testing Cholesky decomposition ---\n");
+// General Cholesky testing function for all three implementations
+void testAllCholesky(double **A, int n, int num_threads) {
+    printf("\n--- Testing Cholesky decomposition (all implementations) ---\n");
     
-    // For original algorithm
-    double **L = allocateMatrix(n);
-    double **LLT = allocateMatrix(n);
+    double **L_orig = allocateMatrix(n);
+    double **L_opt = allocateMatrix(n);
+    double **L_par = allocateMatrix(n);
+    double **Result = allocateMatrix(n);
     
-    // Measure time for original algorithm
+    // Test original implementation
     clock_t start = clock();
-    int result = CholeskyDecomposition(A, L, n);
+    int result_orig = CholeskyDecomposition(A, L_orig, n);
     clock_t end = clock();
     double time_orig = (double)(end - start) / CLOCKS_PER_SEC;
     
-    if (result == -1) {
-        printf("Original algorithm: Cholesky decomposition failed - Matrix is not positive definite\n");
-        freeMatrix(L, n);
-        freeMatrix(LLT, n);
-        return -1.0;
+    if (result_orig == -1) {
+        printf("Original implementation: Matrix is not positive definite\n");
+        freeMatrix(L_orig, n);
+        freeMatrix(L_opt, n);
+        freeMatrix(L_par, n);
+        freeMatrix(Result, n);
+        return;
     }
     
-    // Verify result: A = L*L^T
-    multiplyLowerTriangular(L, LLT, n);
-    double error_orig = matrixError(A, LLT, n);
+    multiplyLowerTriangular(L_orig, Result, n);
+    double error_orig = matrixError(A, Result, n);
     
-    printf("Original algorithm:\n");
-    printf("  Time taken: %f seconds\n", time_orig);
-    printf("  Reconstruction error: %e\n", error_orig);
+    printf("Original implementation:\n");
+    printf("  Time: %f seconds\n", time_orig);
+    printf("  Error: %e\n", error_orig);
     
-    // For optimized algorithm
-    double **L_opt = allocateMatrix(n);
-    double **LLT_opt = allocateMatrix(n);
-    
-    // Measure time for optimized algorithm
+    // Test optimized implementation
     start = clock();
     int result_opt = CholeskyDecomposition_optimized(A, L_opt, n);
     end = clock();
     double time_opt = (double)(end - start) / CLOCKS_PER_SEC;
     
     if (result_opt == -1) {
-        printf("Optimized algorithm: Cholesky decomposition failed - Matrix is not positive definite\n");
-        freeMatrix(L, n);
-        freeMatrix(LLT, n);
+        printf("Optimized implementation: Matrix is not positive definite\n");
+        freeMatrix(L_orig, n);
         freeMatrix(L_opt, n);
-        freeMatrix(LLT_opt, n);
-        return -1.0;
+        freeMatrix(L_par, n);
+        freeMatrix(Result, n);
+        return;
     }
     
-    // Verify result: A = L*L^T
-    multiplyLowerTriangular(L_opt, LLT_opt, n);
-    double error_opt = matrixError(A, LLT_opt, n);
+    multiplyLowerTriangular(L_opt, Result, n);
+    double error_opt = matrixError(A, Result, n);
+    double speedup_opt = time_orig / time_opt;
     
-    double speedup = time_orig / time_opt;
+    printf("Optimized implementation:\n");
+    printf("  Time: %f seconds\n", time_opt);
+    printf("  Error: %e\n", error_opt);
+    printf("  Speedup vs original: %.2f times\n", speedup_opt);
     
-    printf("Optimized algorithm:\n");
-    printf("  Time taken: %f seconds\n", time_opt);
-    printf("  Reconstruction error: %e\n", error_opt);
-    printf("  Speedup: %.2f times\n", speedup);
+    // Test parallel implementation
+    start = clock();
+    int result_par = CholeskyDecomposition_parallel(A, L_par, n, num_threads);
+    end = clock();
+    double time_par = (double)(end - start) / CLOCKS_PER_SEC;
     
+    if (result_par == -1) {
+        printf("Parallel implementation: Matrix is not positive definite\n");
+        freeMatrix(L_orig, n);
+        freeMatrix(L_opt, n);
+        freeMatrix(L_par, n);
+        freeMatrix(Result, n);
+        return;
+    }
+    
+    multiplyLowerTriangular(L_par, Result, n);
+    double error_par = matrixError(A, Result, n);
+    double speedup_par = time_orig / time_par;
+    
+    printf("Parallel implementation (%d threads):\n", num_threads);
+    printf("  Time: %f seconds\n", time_par);
+    printf("  Error: %e\n", error_par);
+    printf("  Speedup vs original: %.2f times\n", speedup_par);
+    printf("  Parallel efficiency: %.2f%%\n", (speedup_par / num_threads) * 100.0);
+    
+    // Display small matrices if requested
     if (n <= 5) {
         printf("Original matrix A:\n");
         printMatrix(A, n, n);
         printf("L matrix (original):\n");
-        printMatrix(L, n, n);
+        printMatrix(L_orig, n, n);
         printf("L matrix (optimized):\n");
         printMatrix(L_opt, n, n);
+        printf("L matrix (parallel):\n");
+        printMatrix(L_par, n, n);
     }
     
-    freeMatrix(L, n);
-    freeMatrix(LLT, n);
+    // Free memory
+    freeMatrix(L_orig, n);
     freeMatrix(L_opt, n);
-    freeMatrix(LLT_opt, n);
-    
-    return speedup;
+    freeMatrix(L_par, n);
+    freeMatrix(Result, n);
 }
 
-// Test LU decomposition with partial pivoting (original and optimized)
-double testPartialPivotingLU(double **A, int n) {
-    printf("\n--- Testing LU decomposition with Partial Pivoting ---\n");
+// General LU with partial pivoting testing function
+void testAllPivotLU(double **A, int n, int num_threads) {
+    printf("\n--- Testing LU decomposition with Partial Pivoting (all implementations) ---\n");
     
-    // For original algorithm
-    double **L = allocateMatrix(n);
-    double **U = allocateMatrix(n);
-    double **PA = allocateMatrix(n);
-    double **LU = allocateMatrix(n);
-    int *P = (int *)malloc(n * sizeof(int));
+    double **L_orig = allocateMatrix(n);
+    double **U_orig = allocateMatrix(n);
+    int *P_orig = (int *)malloc(n * sizeof(int));
+    double **PA_orig = allocateMatrix(n);
     
-    // Make a copy of A to avoid modifying it
-    double **A_copy = allocateMatrix(n);
+    double **L_opt = allocateMatrix(n);
+    double **U_opt = allocateMatrix(n);
+    int *P_opt = (int *)malloc(n * sizeof(int));
+    double **PA_opt = allocateMatrix(n);
+    
+    double **L_par = allocateMatrix(n);
+    double **U_par = allocateMatrix(n);
+    int *P_par = (int *)malloc(n * sizeof(int));
+    double **PA_par = allocateMatrix(n);
+    
+    double **Result = allocateMatrix(n);
+    
+    // Make copies of A for each implementation
+    double **A_orig = allocateMatrix(n);
+    double **A_opt = allocateMatrix(n);
+    double **A_par = allocateMatrix(n);
+    
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            A_copy[i][j] = A[i][j];
+            A_orig[i][j] = A_opt[i][j] = A_par[i][j] = A[i][j];
         }
     }
     
-    // Measure time for original algorithm
+    // Test original implementation
     clock_t start = clock();
-    PartialPivotingLU(A_copy, L, U, P, n);
+    PartialPivotingLU(A_orig, L_orig, U_orig, P_orig, n);
     clock_t end = clock();
     double time_orig = (double)(end - start) / CLOCKS_PER_SEC;
     
-    // Apply permutation to A to get PA
+    // Apply permutation to A
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            PA[i][j] = A[P[i]][j];
+            PA_orig[i][j] = A[P_orig[i]][j];
         }
     }
     
-    // Verify result: PA = L*U
-    multiplyMatrices(L, U, LU, n);
-    double error_orig = matrixError(PA, LU, n);
+    multiplyMatrices(L_orig, U_orig, Result, n);
+    double error_orig = matrixError(PA_orig, Result, n);
     
-    printf("Original algorithm:\n");
-    printf("  Time taken: %f seconds\n", time_orig);
-    printf("  Reconstruction error: %e\n", error_orig);
+    printf("Original implementation:\n");
+    printf("  Time: %f seconds\n", time_orig);
+    printf("  Error: %e\n", error_orig);
     
-    // For optimized algorithm
-    double **L_opt = allocateMatrix(n);
-    double **U_opt = allocateMatrix(n);
-    double **PA_opt = allocateMatrix(n);
-    double **LU_opt = allocateMatrix(n);
-    int *P_opt = (int *)malloc(n * sizeof(int));
-    
-    // Make another copy of A
-    double **A_copy_opt = allocateMatrix(n);
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            A_copy_opt[i][j] = A[i][j];
-        }
-    }
-    
-    // Measure time for optimized algorithm
+    // Test optimized implementation
     start = clock();
-    PartialPivotingLU_optimized(A_copy_opt, L_opt, U_opt, P_opt, n);
+    PartialPivotingLU_optimized(A_opt, L_opt, U_opt, P_opt, n);
     end = clock();
     double time_opt = (double)(end - start) / CLOCKS_PER_SEC;
     
-    // Apply permutation to A to get PA
+    // Apply permutation to A
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             PA_opt[i][j] = A[P_opt[i]][j];
         }
     }
     
-    // Verify result: PA = L*U
-    multiplyMatrices(L_opt, U_opt, LU_opt, n);
-    double error_opt = matrixError(PA_opt, LU_opt, n);
+    multiplyMatrices(L_opt, U_opt, Result, n);
+    double error_opt = matrixError(PA_opt, Result, n);
+    double speedup_opt = time_orig / time_opt;
     
-    double speedup = time_orig / time_opt;
+    printf("Optimized implementation:\n");
+    printf("  Time: %f seconds\n", time_opt);
+    printf("  Error: %e\n", error_opt);
+    printf("  Speedup vs original: %.2f times\n", speedup_opt);
     
-    printf("Optimized algorithm:\n");
-    printf("  Time taken: %f seconds\n", time_opt);
-    printf("  Reconstruction error: %e\n", error_opt);
-    printf("  Speedup: %.2f times\n", speedup);
+    // Test parallel implementation
+    start = clock();
+    PartialPivotingLU_parallel(A_par, L_par, U_par, P_par, n, num_threads);
+    end = clock();
+    double time_par = (double)(end - start) / CLOCKS_PER_SEC;
     
+    // Apply permutation to A
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            PA_par[i][j] = A[P_par[i]][j];
+        }
+    }
+    
+    multiplyMatrices(L_par, U_par, Result, n);
+    double error_par = matrixError(PA_par, Result, n);
+    double speedup_par = time_orig / time_par;
+    
+    printf("Parallel implementation (%d threads):\n", num_threads);
+    printf("  Time: %f seconds\n", time_par);
+    printf("  Error: %e\n", error_par);
+    printf("  Speedup vs original: %.2f times\n", speedup_par);
+    printf("  Parallel efficiency: %.2f%%\n", (speedup_par / num_threads) * 100.0);
+    
+    // Display small matrices if requested
     if (n <= 5) {
         printf("Original matrix A:\n");
         printMatrix(A, n, n);
         printf("Permutation P (original): ");
-        for (int i = 0; i < n; i++) printf("%d ", P[i]);
-        printf("\nPermutation P (optimized): ");
-        for (int i = 0; i < n; i++) printf("%d ", P_opt[i]);
-        printf("\n");
-        printf("L matrix (original):\n");
-        printMatrix(L, n, n);
+        for (int i = 0; i < n; i++) printf("%d ", P_orig[i]);
+        printf("\nL matrix (original):\n");
+        printMatrix(L_orig, n, n);
         printf("U matrix (original):\n");
-        printMatrix(U, n, n);
-        printf("L matrix (optimized):\n");
-        printMatrix(L_opt, n, n);
-        printf("U matrix (optimized):\n");
-        printMatrix(U_opt, n, n);
+        printMatrix(U_orig, n, n);
     }
     
-    free(P);
-    free(P_opt);
-    freeMatrix(L, n);
-    freeMatrix(U, n);
-    freeMatrix(PA, n);
-    freeMatrix(LU, n);
-    freeMatrix(A_copy, n);
+    // Free memory
+    freeMatrix(L_orig, n);
+    freeMatrix(U_orig, n);
+    free(P_orig);
+    freeMatrix(PA_orig, n);
+    
     freeMatrix(L_opt, n);
     freeMatrix(U_opt, n);
+    free(P_opt);
     freeMatrix(PA_opt, n);
-    freeMatrix(LU_opt, n);
-    freeMatrix(A_copy_opt, n);
     
-    return speedup;
+    freeMatrix(L_par, n);
+    freeMatrix(U_par, n);
+    free(P_par);
+    freeMatrix(PA_par, n);
+    
+    freeMatrix(Result, n);
+    freeMatrix(A_orig, n);
+    freeMatrix(A_opt, n);
+    freeMatrix(A_par, n);
 }
 
-// Test LDL^T decomposition (original and optimized)
-double testLDLTDecomposition(double **A, int n) {
-    printf("\n--- Testing LDL^T decomposition ---\n");
+// General LDLT testing function
+void testAllLDLT(double **A, int n, int num_threads) {
+    printf("\n--- Testing LDL^T decomposition (all implementations) ---\n");
     
-    // For original algorithm
-    double **L = allocateMatrix(n);
-    double *D = (double *)malloc(n * sizeof(double));
-    double **LDLT = allocateMatrix(n);
+    double **L_orig = allocateMatrix(n);
+    double *D_orig = (double *)malloc(n * sizeof(double));
+    double **LD_orig = allocateMatrix(n);
     
-    // Measure time for original algorithm
+    double **L_opt = allocateMatrix(n);
+    double *D_opt = (double *)malloc(n * sizeof(double));
+    double **LD_opt = allocateMatrix(n);
+    
+    double **L_par = allocateMatrix(n);
+    double *D_par = (double *)malloc(n * sizeof(double));
+    double **LD_par = allocateMatrix(n);
+    
+    double **Result = allocateMatrix(n);
+    
+    // Test original implementation
     clock_t start = clock();
-    int result = LDLTDecomposition(A, L, D, n);
+    int result_orig = LDLTDecomposition(A, L_orig, D_orig, n);
     clock_t end = clock();
     double time_orig = (double)(end - start) / CLOCKS_PER_SEC;
     
-    if (result == -1) {
-        printf("Original algorithm: LDL^T decomposition failed - Matrix is not symmetric or decomposition failed\n");
-        freeMatrix(L, n);
-        free(D);
-        freeMatrix(LDLT, n);
-        return -1.0;
+    if (result_orig == -1) {
+        printf("Original implementation: Matrix is not symmetric or decomposition failed\n");
+        freeMatrix(L_orig, n);
+        free(D_orig);
+        freeMatrix(LD_orig, n);
+        freeMatrix(L_opt, n);
+        free(D_opt);
+        freeMatrix(LD_opt, n);
+        freeMatrix(L_par, n);
+        free(D_par);
+        freeMatrix(LD_par, n);
+        freeMatrix(Result, n);
+        return;
     }
     
-    // Verify result: A = L*D*L^T
-    // First compute L*D
-    double **LD = allocateMatrix(n);
+    // Calculate L*D
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            LD[i][j] = L[i][j] * (j == i ? D[j] : (j < i ? 1.0 : 0.0));
+            LD_orig[i][j] = L_orig[i][j] * (j == i ? D_orig[j] : (j < i ? 1.0 : 0.0));
         }
     }
     
-    // Then compute (L*D)*L^T
+    // Calculate (L*D)*L^T
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            LDLT[i][j] = 0.0;
-            for (int k = 0; k < n; k++) {
-                if (k <= i && k <= j) { // Only where both L and L^T have non-zeros
-                    LDLT[i][j] += LD[i][k] * L[j][k];
-                }
+            Result[i][j] = 0.0;
+            for (int k = 0; k <= (i < j ? i : j); k++) {
+                Result[i][j] += LD_orig[i][k] * L_orig[j][k];
             }
         }
     }
+    double error_orig = matrixError(A, Result, n);
     
-    double error_orig = matrixError(A, LDLT, n);
+    printf("Original implementation:\n");
+    printf("  Time: %f seconds\n", time_orig);
+    printf("  Error: %e\n", error_orig);
     
-    printf("Original algorithm:\n");
-    printf("  Time taken: %f seconds\n", time_orig);
-    printf("  Reconstruction error: %e\n", error_orig);
-    
-    // For optimized algorithm
-    double **L_opt = allocateMatrix(n);
-    double *D_opt = (double *)malloc(n * sizeof(double));
-    double **LDLT_opt = allocateMatrix(n);
-    
-    // Measure time for optimized algorithm
+    // Test optimized implementation
     start = clock();
     int result_opt = LDLTDecomposition_optimized(A, L_opt, D_opt, n);
     end = clock();
     double time_opt = (double)(end - start) / CLOCKS_PER_SEC;
     
     if (result_opt == -1) {
-        printf("Optimized algorithm: LDL^T decomposition failed - Matrix is not symmetric or decomposition failed\n");
-        freeMatrix(L, n);
-        free(D);
-        freeMatrix(LDLT, n);
-        freeMatrix(LD, n);
+        printf("Optimized implementation: Matrix is not symmetric or decomposition failed\n");
+        freeMatrix(L_orig, n);
+        free(D_orig);
+        freeMatrix(LD_orig, n);
         freeMatrix(L_opt, n);
         free(D_opt);
-        freeMatrix(LDLT_opt, n);
-        return -1.0;
+        freeMatrix(LD_opt, n);
+        freeMatrix(L_par, n);
+        free(D_par);
+        freeMatrix(LD_par, n);
+        freeMatrix(Result, n);
+        return;
     }
     
-    // Verify result: A = L*D*L^T for optimized version
-    double **LD_opt = allocateMatrix(n);
+    // Calculate L*D
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             LD_opt[i][j] = L_opt[i][j] * (j == i ? D_opt[j] : (j < i ? 1.0 : 0.0));
         }
     }
     
+    // Calculate (L*D)*L^T
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            LDLT_opt[i][j] = 0.0;
-            for (int k = 0; k < n; k++) {
-                if (k <= i && k <= j) {
-                    LDLT_opt[i][j] += LD_opt[i][k] * L_opt[j][k];
-                }
+            Result[i][j] = 0.0;
+            for (int k = 0; k <= (i < j ? i : j); k++) {
+                Result[i][j] += LD_opt[i][k] * L_opt[j][k];
             }
         }
     }
+    double error_opt = matrixError(A, Result, n);
+    double speedup_opt = time_orig / time_opt;
     
-    double error_opt = matrixError(A, LDLT_opt, n);
+    printf("Optimized implementation:\n");
+    printf("  Time: %f seconds\n", time_opt);
+    printf("  Error: %e\n", error_opt);
+    printf("  Speedup vs original: %.2f times\n", speedup_opt);
     
-    double speedup = time_orig / time_opt;
+    // Test parallel implementation
+    start = clock();
+    int result_par = LDLTDecomposition_parallel(A, L_par, D_par, n, num_threads);
+    end = clock();
+    double time_par = (double)(end - start) / CLOCKS_PER_SEC;
     
-    printf("Optimized algorithm:\n");
-    printf("  Time taken: %f seconds\n", time_opt);
-    printf("  Reconstruction error: %e\n", error_opt);
-    printf("  Speedup: %.2f times\n", speedup);
+    if (result_par == -1) {
+        printf("Parallel implementation: Matrix is not symmetric or decomposition failed\n");
+        freeMatrix(L_orig, n);
+        free(D_orig);
+        freeMatrix(LD_orig, n);
+        freeMatrix(L_opt, n);
+        free(D_opt);
+        freeMatrix(LD_opt, n);
+        freeMatrix(L_par, n);
+        free(D_par);
+        freeMatrix(LD_par, n);
+        freeMatrix(Result, n);
+        return;
+    }
     
+    // Calculate L*D
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            LD_par[i][j] = L_par[i][j] * (j == i ? D_par[j] : (j < i ? 1.0 : 0.0));
+        }
+    }
+    
+    // Calculate (L*D)*L^T
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            Result[i][j] = 0.0;
+            for (int k = 0; k <= (i < j ? i : j); k++) {
+                Result[i][j] += LD_par[i][k] * L_par[j][k];
+            }
+        }
+    }
+    double error_par = matrixError(A, Result, n);
+    double speedup_par = time_orig / time_par;
+    
+    printf("Parallel implementation (%d threads):\n", num_threads);
+    printf("  Time: %f seconds\n", time_par);
+    printf("  Error: %e\n", error_par);
+    printf("  Speedup vs original: %.2f times\n", speedup_par);
+    printf("  Parallel efficiency: %.2f%%\n", (speedup_par / num_threads) * 100.0);
+    
+    // Display small matrices if requested
     if (n <= 5) {
         printf("Original matrix A:\n");
         printMatrix(A, n, n);
         printf("L matrix (original):\n");
-        printMatrix(L, n, n);
+        printMatrix(L_orig, n, n);
         printf("D diagonal (original): ");
-        for (int i = 0; i < n; i++) printf("%8.4f ", D[i]);
-        printf("\nL matrix (optimized):\n");
-        printMatrix(L_opt, n, n);
-        printf("D diagonal (optimized): ");
-        for (int i = 0; i < n; i++) printf("%8.4f ", D_opt[i]);
+        for (int i = 0; i < n; i++) printf("%8.4f ", D_orig[i]);
         printf("\n");
     }
     
-    freeMatrix(L, n);
-    free(D);
-    freeMatrix(LDLT, n);
-    freeMatrix(LD, n);
+    // Free memory
+    freeMatrix(L_orig, n);
+    free(D_orig);
+    freeMatrix(LD_orig, n);
+    
     freeMatrix(L_opt, n);
     free(D_opt);
-    freeMatrix(LDLT_opt, n);
     freeMatrix(LD_opt, n);
     
-    return speedup;
+    freeMatrix(L_par, n);
+    free(D_par);
+    freeMatrix(LD_par, n);
+    
+    freeMatrix(Result, n);
 }
