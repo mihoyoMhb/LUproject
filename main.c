@@ -24,10 +24,6 @@ void runAllTests(int num_threads) {
     int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
     
     // For storing total speedups to calculate average
-    double total_lu_speedup = 0.0;
-    double total_chol_speedup = 0.0; 
-    double total_plu_speedup = 0.0;
-    double total_ldlt_speedup = 0.0;
     int valid_tests = 0;
     
     for (int s = 0; s < num_sizes; s++) {

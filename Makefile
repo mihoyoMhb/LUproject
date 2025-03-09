@@ -4,7 +4,7 @@
 # Compiler and flags
 CC = gcc
 # Added proper OpenMP flags for parallel execution
-CFLAGS = -Wall -Wextra -O2 -fopenmp -ftree-vectorize -march=native
+CFLAGS = -Wall -Wextra -O2 -fopenmp -ftree-vectorize -march=native -fopt-info-vec-optimized
 LDFLAGS = -lm -fopenmp
 
 # Target executable
