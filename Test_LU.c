@@ -7,20 +7,25 @@
 #include "LU_parallel.h"
 #include "Test_LU.h"
 
-// Allocate a dynamic 2D matrix
 double** allocateMatrix(int n) {
+    // 分配行指针数组（n 个 double*）
     double **matrix = (double**)malloc(n * sizeof(double*));
+    // 分配一个连续的内存块，存储 n*n 个 double
+    double *data = (double*)malloc(n * n * sizeof(double));
+    // 将每个行指针指向连续内存中的对应位置
     for (int i = 0; i < n; i++) {
-        matrix[i] = (double*)malloc(n * sizeof(double));
+        matrix[i] = data + i * n;
     }
     return matrix;
 }
 
-// Free a dynamic 2D matrix
+// 释放连续内存的二维矩阵
 void freeMatrix(double **matrix, int n) {
-    for (int i = 0; i < n; i++) {
-        free(matrix[i]);
+    if (n > 0) {
+        // 释放连续分配的内存块
+        free(matrix[0]);
     }
+    // 释放行指针数组
     free(matrix);
 }
 
