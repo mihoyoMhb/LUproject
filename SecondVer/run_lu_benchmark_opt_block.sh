@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Compile the optimized code with optimization flags
-gcc -o situ_parallel_opt situ_parallel_opt.c -O3 -march=native -fopenmp -ffast-math -ftree-vectorize -lm
+gcc -o situ_parallel_opt_block situ_parallel_opt_block.c -O3 -march=native -fopenmp -ffast-math -ftree-vectorize -lm
 
 # Check if compilation was successful
 if [ $? -ne 0 ]; then
@@ -16,7 +16,7 @@ SIZES=(64 128 512 1024 2048 4096)
 THREADS=(1 2 4 8 16)
 
 # Output file
-OUTPUT_FILE="lu_benchmark_results_opt.csv"
+OUTPUT_FILE="lu_benchmark_results_opt_block.csv"
 
 # Write header to output file
 echo "Size,Threads,Time,Speedup" > $OUTPUT_FILE
@@ -29,7 +29,7 @@ get_execution_time() {
 
 # Run the benchmarks
 for size in "${SIZES[@]}"; do
-    echo "Testing optimized version with problem size: $size"
+    echo "Testing block-optimized version with problem size: $size"
     echo "------------------------------------------------"
     
     # Variable to store single thread average time for speedup calculations
@@ -44,7 +44,7 @@ for size in "${SIZES[@]}"; do
         
         # Run 3 times
         for run in {1..3}; do
-            output=$(./situ_parallel_opt $thread $size)
+            output=$(./situ_parallel_opt_block $thread $size)
             time_taken=$(get_execution_time "$output")
             total_time=$(echo "$total_time + $time_taken" | bc -l)
         done

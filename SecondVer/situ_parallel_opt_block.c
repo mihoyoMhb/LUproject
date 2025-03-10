@@ -1,9 +1,9 @@
-/*File name: situ_parallel_opt.c*/
+/*File name: situ_parallel_opt_block.c*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <omp.h>
-//gcc -o situ ssitu_parallel_opt.c -O3 -march=native -fopenmp -ffast-math -ftree-vectorize
+//gcc -o situ situ_parallel_opt_block.c -O3 -march=native -fopenmp -ffast-math -ftree-vectorize
 // Helper function to allocate a matrix
 double **allocate_matrix(int n) {
     double **mat = (double **) aligned_alloc(64, n * sizeof(double *));
@@ -145,32 +145,31 @@ void lu_in_situ_ver_final(double ** restrict A, int n) {
 
     May not be useful since we haven't done any further optimization yet.
     */
-    #pragma omp parallel
-    {
-        // 外层循环 k：每一步更新主元所在行及后续的子矩阵
-        for (int k = 0; k < n; k++) {
-            // 串行部分：对当前列 A[k+1:n][k] 进行除法更新
-            #pragma omp single
-            {
-                double pivot = A[k][k];
-                double temp = 1.0 / pivot;
-                for (int i = k + 1; i < n; i++) {
-                    A[i][k] *= temp;
-                }
-            }
-            // 隐式 barrier 在 single 结束后同步所有线程
+   #pragma omp parallel
+   {
+       const int block_size = 32; // 根据实际缓存调整块大小
+       for (int k = 0; k < n; k++) {
+           #pragma omp single
+           {
+               double pivot = A[k][k];
+               double temp = 1.0 / pivot;
+               for (int i = k + 1; i < n; i++) {
+                   A[i][k] *= temp;
+               }
+           }
 
-            // 内层消元更新：并行更新 A[k+1:n][k+1:n]
-            // 采用静态循环调度（cyclic 分配，每个线程交替处理），保证数据局部性
-            #pragma omp for schedule(static)
-            for (int i = k + 1; i < n; i++) {
-                for (int j = k + 1; j < n; j++) {
-                    A[i][j] -= A[i][k] * A[k][j];
-                }
-            }
-            # pragma omp barrier
-        }
-    }
+           // 分块并行处理
+           #pragma omp for schedule(static) 
+           for (int i = k + 1; i < n; i++) {
+               for (int jj = k + 1; jj < n; jj += block_size) {
+                   int j_end = (jj + block_size < n) ? jj + block_size : n;
+                   for (int j = jj; j < j_end; j++) {
+                       A[i][j] -= A[i][k] * A[k][j];
+                   }
+               }
+           }
+       }
+   }
 }
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -195,7 +194,7 @@ int main(int argc, char* argv[]) {
 
 
     //Save the original matrix for error calculation
-    //double **A_orig = allocate_matrix(n);
+    // double **A_orig = allocate_matrix(n);
     // for (int i = 0; i < n; i++){
     //     for (int j = 0; j < n; j++){
     //         A_orig[i][j] = A[i][j];

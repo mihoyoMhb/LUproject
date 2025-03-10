@@ -30,40 +30,49 @@ get_execution_time() {
 # Run the benchmarks
 for size in "${SIZES[@]}"; do
     echo "Testing problem size: $size"
+    echo "------------------------------------------------"
     
-    # Run single-threaded version (just once)
-    echo "  Running with 1 thread..."
-    output=$(./situ_parallel_naive 1 $size)
-    single_thread_time=$(get_execution_time "$output")
-    echo "  Single thread time: $single_thread_time seconds"
+    # Variable to store single thread average time for speedup calculations
+    single_thread_avg_time=0
     
-    # Record the single thread result
-    echo "$size,1,$single_thread_time,1.0" >> $OUTPUT_FILE
-    
-    # Run multi-threaded versions (3 times each, take minimum)
-    for thread in "${THREADS[@]:1}"; do  # Skip the first element (1 thread)
+    # Run all thread counts 3 times each and take the average
+    for thread in "${THREADS[@]}"; do
         echo "  Running with $thread threads..."
         
+        # Variables for calculating average
+        total_time=0
+        
         # Run 3 times
-        min_time=9999999  # Initialize to a large value
         for run in {1..3}; do
             output=$(./situ_parallel_naive $thread $size)
             time_taken=$(get_execution_time "$output")
-            
-            # Update minimum time if this run is faster
-            if (( $(echo "$time_taken < $min_time" | bc -l) )); then
-                min_time=$time_taken
-            fi
+            total_time=$(echo "$total_time + $time_taken" | bc -l)
         done
         
-        # Calculate speedup
-        speedup=$(echo "scale=4; $single_thread_time / $min_time" | bc)
-        echo "  Best time with $thread threads: $min_time seconds (speedup: $speedup)"
+        # Calculate average time
+        avg_time=$(echo "scale=6; $total_time / 3" | bc -l)
+        echo "  Average time with $thread threads: $avg_time seconds"
+        
+        # Store single thread time for speedup calculations
+        if [ "$thread" -eq "1" ]; then
+            single_thread_avg_time=$avg_time
+            echo "  Baseline single thread time: $single_thread_avg_time seconds"
+            echo "  Speedup with $thread threads: 1.00x"
+        else
+            # Calculate speedup
+            speedup=$(echo "scale=4; $single_thread_avg_time / $avg_time" | bc -l)
+            echo "  Speedup with $thread threads: ${speedup}x"
+        fi
         
         # Record the result
-        echo "$size,$thread,$min_time,$speedup" >> $OUTPUT_FILE
+        if [ "$thread" -eq "1" ]; then
+            echo "$size,$thread,$avg_time,1.0" >> $OUTPUT_FILE
+        else
+            echo "$size,$thread,$avg_time,$speedup" >> $OUTPUT_FILE
+        fi
     done
     
+    echo "------------------------------------------------"
     echo ""  # Add an empty line between different problem sizes
 done
 
