@@ -11,8 +11,8 @@ mkdir -p results
 RESULT_FILE="results/performance_results.txt"
 
 # Define matrix sizes and thread counts
-MATRIX_SIZES=(64 128 256 512 1024 2048 4096)
-THREAD_COUNTS=(1 2 3 4 5 6 7 8)
+MATRIX_SIZES=(256 512 1024 2048 4096)
+THREAD_COUNTS=(1 2 4 6 8 10 12 14 16)
 RUNS=3
 
 # Compile the program

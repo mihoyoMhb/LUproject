@@ -1,0 +1,9 @@
+Performance Results - Matrix Decomposition
+Format: Algorithm: Thread count, Matrix size, Time (seconds)
+-----------------------------------------------------------
+LU: Thread 1, Matrix size 256, Time .015573
+Cholesky: Thread 1, Matrix size 256, Time .002589
+LU: Thread 1, Matrix size 512, Time .284579
+Cholesky: Thread 1, Matrix size 512, Time .016533
+LU: Thread 1, Matrix size 1024, Time 6.959756
+Cholesky: Thread 1, Matrix size 1024, Time .187732
