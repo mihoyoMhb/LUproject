@@ -44,53 +44,6 @@ void LUdecomposition_optimized_parallel(double * restrict const * restrict A,
     }
 }
 
-/* Parallel optimized Cholesky decomposition: requires A to be symmetric positive definite, result satisfies A = L * L^T */
-int CholeskyDecomposition_optimized_parallel(double * restrict const * restrict A, 
-                                               double * restrict * restrict L, 
-                                               const int n) {
-   
-    /*
-    https://en.wikipedia.org/wiki/Cholesky_decomposition
-    https://www.geeksforgeeks.org/cholesky-decomposition-matrix-decomposition/
-    */    
-    
-    #pragma omp parallel for collapse(2) schedule(static)
-    for (int i = 0; i < n; i++){
-        for (int j = 0; j < n; j++){
-            L[i][j] = 0.0;
-        }
-    }
-    
-    // Cholesky decomposition: outer loop processes each column sequentially
-    for (int j = 0; j < n; j++) {
-        double sum_diag = A[j][j];
-        // Parallel computation of diagonal update accumulation (using reduction)
-        #pragma omp parallel for reduction(-:sum_diag) schedule(static) default(none) shared(L, j)
-        for (int k = 0; k < j; k++) {
-            double L_jk = L[j][k];
-            sum_diag -= L_jk * L_jk;
-        }
-        
-        if (sum_diag <= 0.0) {
-            return -1;  // Matrix is not positive definite
-        }
-        
-        L[j][j] = sqrt(sum_diag);
-        double inv_L_jj = 1.0 / L[j][j];
-        
-        // Calculate remaining elements of j-th column (i = j+1..n-1) in parallel
-        #pragma omp parallel for schedule(static) default(none) shared(A, L, n, j, inv_L_jj)
-        for (int i = j + 1; i < n; i++) {
-            double sum = A[i][j];
-            for (int k = 0; k < j; k++) {
-                sum -= L[i][k] * L[j][k];
-            }
-            L[i][j] = sum * inv_L_jj;
-        }
-    }
-    return 0;
-}
-
 /* ===== Helper Functions ===== */
 
 // Allocate n x n matrix (double type)
@@ -220,48 +173,6 @@ int main(int argc, char *argv[]) {
     free_matrix(A_lu_copy, n);
     free_matrix(LU_product, n);
     
-    /* ---- Test Parallel Cholesky Decomposition ---- */
-    double **A_chol = allocate_matrix(n);
-    double **L_chol = allocate_matrix(n);
-    generate_spd_matrix(A_chol, n);
-    
-    // Backup A_chol for error calculation
-    double **A_chol_copy = allocate_matrix(n);
-    for (int i = 0; i < n; i++){
-        for (int j = 0; j < n; j++){
-            A_chol_copy[i][j] = A_chol[i][j];
-        }
-    }
-    
-    start = omp_get_wtime();
-    int chol_status = CholeskyDecomposition_optimized_parallel(A_chol, L_chol, n);
-    end = omp_get_wtime();
-    double chol_time = end - start;
-    
-    if (chol_status != 0) {
-        printf("\nParallel Cholesky decomposition failed: Matrix is not positive definite.\n");
-    } else {
-        // Calculate L * L^T
-        double **LLT = allocate_matrix(n);
-        for (int i = 0; i < n; i++){
-            for (int j = 0; j < n; j++){
-                double sum = 0.0;
-                for (int k = 0; k < n; k++){
-                    sum += L_chol[i][k] * L_chol[j][k];
-                }
-                LLT[i][j] = sum;
-            }
-        }
-        double chol_error = frobenius_norm_diff(A_chol_copy, LLT, n);
-        printf("\nParallel Cholesky Decomposition:\n");
-        printf("Time: %f seconds\n", chol_time);
-        printf("Frobenius norm error: %e\n", chol_error);
-        free_matrix(LLT, n);
-    }
-    
-    free_matrix(A_chol, n);
-    free_matrix(L_chol, n);
-    free_matrix(A_chol_copy, n);
     
     return 0;
 }
