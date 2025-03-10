@@ -146,7 +146,8 @@ void lu_in_situ_ver_final(double ** restrict A, int n) {
     May not be useful since we haven't done any further optimization yet.
     */
     #pragma omp parallel
-    {
+    {   
+
         // 外层循环 k：每一步更新主元所在行及后续的子矩阵
         for (int k = 0; k < n; k++) {
             // 串行部分：对当前列 A[k+1:n][k] 进行除法更新
@@ -191,8 +192,8 @@ int main(int argc, char* argv[]) {
 
 
 
+    
     parallel_initialize_matrix(A, n);
-
 
     //Save the original matrix for error calculation
     //double **A_orig = allocate_matrix(n);
